@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import axios from "axios";
 
 const InvoiceForm = () => {
@@ -19,9 +19,12 @@ const InvoiceForm = () => {
     invoiceDate: "",
     reverseCharge: "No",
     items: [],
-    companyLogo: "companyLogo",
-    signatureImage: "signatureImage",
+    companyLogo: "https://upload.wikimedia.org/wikipedia/commons/3/36/Logo_nike_principal.jpg",
+    signatureImage: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTXKqB-RJnHjxHOHdlbkHyZ7bwLQPzyTRXM1w&s",
   });
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const image_hosting_Key = import.meta.env.VITE_image_hosting_Key;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -45,31 +48,89 @@ const InvoiceForm = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleFileChange = (e) => {
+    setSelectedFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      console.error("No file selected for upload");
+      return null;
+    }
+
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+
+    for (let [key, value] of formData.entries()) {
+      console.log(key, value);
+    }
+
     try {
       const response = await axios.post(
-        "http://localhost:5000/generate-invoice",
-        data,
-        { responseType: "blob" }
+        `https://api.imgbb.com/1/upload?key=${image_hosting_Key}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", "invoice.pdf");
-      document.body.appendChild(link);
-      link.click();
+
+      if (response.status === 200) {
+        console.log("File uploaded successfully:", response.data.data.url);
+        return response.data.data.url;
+      } else {
+        console.error("Unexpected response status:", response.status);
+        return null;
+      }
     } catch (error) {
-      console.error("Error generating invoice:", error);
+      console.error(
+        "Error uploading file:",
+        error.response ? error.response.data : error.message
+      );
+      return null;
     }
   };
 
-  console.log(data);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const logoUrl = await handleUpload();
+    if (logoUrl) {
+      setData((prevData) => ({
+        ...prevData,
+        companyLogo: logoUrl,
+      }));
+
+      try {
+        const response = await axios.post(
+          "http://localhost:5000/generate-invoice",
+          { ...data, companyLogo: logoUrl },
+          { responseType: "blob" }
+        );
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "invoice.pdf");
+        document.body.appendChild(link);
+        link.click();
+      } catch (error) {
+        console.error("Error generating invoice:", error);
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-3xl font-bold mb-6">Invoice Generator</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <label className="form-control w-full">
+          <h2 className="text-xl font-semibold text-left mb-2">Company Logo</h2>
+          <input
+            type="file"
+            onChange={handleFileChange}
+            className="file-input file-input-bordered w-full max-w-xs"
+          />
+        </label>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <h2 className="text-xl font-semibold col-span-full">
             Seller Details
@@ -169,43 +230,43 @@ const InvoiceForm = () => {
             className="input input-bordered w-full"
           />
         </div>
-          <div className="grid grid-cols-3 gap-6">
-            <div>
-                <h2 className="text-xl font-semibold text-left mb-2">Order Date</h2>
-                <input
-                type="date"
-                name="orderDate"
-                placeholder="Order Date"
-                onChange={handleInputChange}
-                className="input input-bordered w-full"
-                />
-            </div>
-            <div>
-                <h2 className="text-xl font-semibold text-left mb-2">
-                Invoice Date
-                </h2>
-                <input
-                type="date"
-                name="invoiceDate"
-                placeholder="Invoice Date"
-                onChange={handleInputChange}
-                className="input input-bordered w-full"
-                />
-            </div>
-            <div>
-                <h2 className="text-xl font-semibold text-left mb-2">
-                Reverse Charge
-                </h2>
-                <select
-                name="reverseCharge"
-                onChange={handleInputChange}
-                className="select select-bordered w-full"
-                >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-                </select>
-            </div>
+        <div className="grid grid-cols-3 gap-6">
+          <div>
+            <h2 className="text-xl font-semibold text-left mb-2">Order Date</h2>
+            <input
+              type="date"
+              name="orderDate"
+              placeholder="Order Date"
+              onChange={handleInputChange}
+              className="input input-bordered w-full"
+            />
           </div>
+          <div>
+            <h2 className="text-xl font-semibold text-left mb-2">
+              Invoice Date
+            </h2>
+            <input
+              type="date"
+              name="invoiceDate"
+              placeholder="Invoice Date"
+              onChange={handleInputChange}
+              className="input input-bordered w-full"
+            />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-left mb-2">
+              Reverse Charge
+            </h2>
+            <select
+              name="reverseCharge"
+              onChange={handleInputChange}
+              className="select select-bordered w-full"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+        </div>
         <div className="space-x-4">
           <button
             type="button"
@@ -224,27 +285,27 @@ const InvoiceForm = () => {
                 className="textarea textarea-bordered textarea-md w-full"
               ></textarea>
               <div className="grid grid-cols-3 gap-6">
-              <input
-                type="number"
-                name="unitPrice"
-                placeholder="Unit Price"
-                onChange={(e) => handleItemChange(index, e)}
-                className="input input-bordered w-full"
-              />
-              <input
-                type="number"
-                name="quantity"
-                placeholder="Quantity"
-                onChange={(e) => handleItemChange(index, e)}
-                className="input input-bordered w-full"
-              />
-              <input
-                type="number"
-                name="discount"
-                placeholder="Discount"
-                onChange={(e) => handleItemChange(index, e)}
-                className="input input-bordered w-full"
-              />
+                <input
+                  type="number"
+                  name="unitPrice"
+                  placeholder="Unit Price"
+                  onChange={(e) => handleItemChange(index, e)}
+                  className="input input-bordered w-full"
+                />
+                <input
+                  type="number"
+                  name="quantity"
+                  placeholder="Quantity"
+                  onChange={(e) => handleItemChange(index, e)}
+                  className="input input-bordered w-full"
+                />
+                <input
+                  type="number"
+                  name="discount"
+                  placeholder="Discount"
+                  onChange={(e) => handleItemChange(index, e)}
+                  className="input input-bordered w-full"
+                />
               </div>
             </div>
           ))}
